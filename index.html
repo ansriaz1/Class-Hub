@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Whiteboard</title>
+<style>
+  body, html { margin:0; padding:0; height:100%; display:flex; flex-direction:column; font-family:sans-serif; }
+  canvas { flex:1; touch-action:none; }
+  #toolbar {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: #eee;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+    z-index: 100;
+  }
+  #toolbar button, #toolbar input[type=color], #toolbar input[type=range] {
+    flex: 1;
+    font-size: 16px;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="board"></canvas>
+
+<div id="toolbar">
+  <button onclick="clearCanvas()">Clear</button>
+  <button onclick="undoCanvas()">Undo</button>
+  <input type="color" id="colorPicker" value="#000000">
+  <input type="range" id="thickness" min="1" max="20" value="3">
+  <button onclick="saveCanvas()">Save</button>
+</div>
+
+<script>
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - document.getElementById('toolbar').offsetHeight;
+  redraw(); // redraw after resize
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let drawing = false;
+let history = [];
+let redoHistory = [];
+
+function saveState(){
+  history.push(canvas.toDataURL());
+  if(history.length > 50) history.shift(); // limit history
+}
+
+function undoCanvas(){
+  if(history.length > 0){
+    redoHistory.push(canvas.toDataURL());
+    const last = history.pop();
+    const img = new Image();
+    img.src = last;
+    img.onload = ()=> ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  }
+}
+
+function startDrawing(e){ drawing = true; saveState(); draw(e); }
+function stopDrawing(e){ drawing = false; ctx.beginPath(); }
+function getCoords(e){
+  if(e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY - document.getElementById('toolbar').offsetHeight };
+  return { x: e.clientX, y: e.clientY - document.getElementById('toolbar').offsetHeight };
+}
+
+function draw(e){
+  if(!drawing) return;
+  e.preventDefault();
+  const {x, y} = getCoords(e);
+  ctx.lineWidth = document.getElementById('thickness').value;
+  ctx.strokeStyle = document.getElementById('colorPicker').value;
+  ctx.lineCap = 'round';
+
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+}
+
+function clearCanvas(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function saveCanvas(){
+  const link = document.createElement('a');
+  link.download = 'whiteboard.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function redraw(){
+  if(history.length > 0){
+    const img = new Image();
+    img.src = history[history.length - 1];
+    img.onload = ()=> ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  }
+}
+
+// Event listeners for touch & mouse
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mousemove', draw);
+
+canvas.addEventListener('touchstart', startDrawing, {passive:false});
+canvas.addEventListener('touchend', stopDrawing);
+canvas.addEventListener('touchmove', draw, {passive:false});
+
+</script>
+
+</body>
+  </html>
